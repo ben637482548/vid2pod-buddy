@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Rumble Player Laboratory</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #07101d; color: #eaf2ff; }
+    .bar { position: sticky; top: 0; z-index: 20; padding: .7rem; background: rgba(7,16,29,.95); border-bottom: 1px solid #2a3a52; }
+    .status { display: flex; justify-content: space-between; gap: .7rem; align-items: center; margin-bottom: .55rem; }
+    .status strong { font-size: .9rem; }
+    .status span { color: #9eb0c8; font-size: .72rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+    button { min-height: 38px; border: 1px solid #334966; background: #1b2d47; color: #eaf2ff; border-radius: 9px; padding: .45rem .65rem; font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
+    button.primary { background: #85c742; border-color: #85c742; color: #07101d; }
+    button.warn { background: #ffcf70; border-color: #ffcf70; color: #261b03; }
+    #rumble-player { min-height: 290px; background: #02060d; position: relative; display: grid; place-items: center; overflow: hidden; }
+    #rumble-player video { max-width: 100%; width: 100%; max-height: 420px; }
+    .message { color: #9eb0c8; padding: 1rem; text-align: center; }
+    .facts { display: grid; grid-template-columns: 8rem 1fr; gap: .28rem .7rem; padding: .75rem; margin: 0; border-top: 1px solid #2a3a52; font-size: .72rem; }
+    .facts dt { color: #9eb0c8; }
+    .facts dd { margin: 0; overflow-wrap: anywhere; }
+    pre { max-height: 180px; overflow: auto; margin: 0; padding: .75rem; border-top: 1px solid #2a3a52; background: #02060d; color: #bdd7ff; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <div class="status"><strong>Instrumented Rumble player lab</strong><span id="lab-mode">Waiting for parent</span></div>
+    <div class="actions">
+      <button class="primary" id="initialize" type="button">1. Initialize Rumble player</button>
+      <button id="play" type="button">2. Play</button>
+      <button id="pause" type="button">Pause</button>
+      <button id="back" type="button">−15s</button>
+      <button id="forward" type="button">+30s</button>
+      <button id="rate" type="button">1.5×</button>
+      <button id="inspect" type="button">Inspect</button>
+      <button class="warn" id="destroy" type="button">Destroy</button>
+    </div>
+  </div>
+  <div id="rumble-player"><p class="message">Connect the parent app, then tap Initialize inside this frame. The in-frame tap preserves user activation on iPhone.</p></div>
+  <dl id="facts" class="facts"></dl>
+  <pre id="local-log" aria-label="Player laboratory log"></pre>
+  <script src="./player-lab.js"></script>
+</body>
+</html>

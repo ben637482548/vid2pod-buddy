@@ -1,0 +1,18 @@
+{
+  "name": "Rumble Capability Lab",
+  "short_name": "Rumble Lab",
+  "description": "Static GitHub Pages diagnostics for Rumble playback, HLS, background audio, and on-device resolution.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#09111f",
+  "theme_color": "#101827",
+  "categories": ["utilities", "developer tools", "music"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

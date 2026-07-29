@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Static GitHub Pages capability laboratory for testing Rumble playback on iPhone and modern browsers.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Rumble Capability Lab</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to diagnostics</a>
+
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">GitHub Pages–only diagnostic kit</p>
+      <h1>Rumble Capability Lab</h1>
+      <p class="subtitle">Resolve, probe, observe, and export exactly what Safari can do—without a backend.</p>
+    </div>
+    <div class="header-badges" aria-label="Runtime status">
+      <span class="badge" id="badge-online">Network: checking</span>
+      <span class="badge" id="badge-context">Context: checking</span>
+      <span class="badge" id="badge-display">Display: checking</span>
+      <span class="badge" id="badge-sw">Service worker: checking</span>
+    </div>
+  </header>
+
+  <main id="main" class="layout">
+    <section class="panel hero-panel" aria-labelledby="source-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Step 1</p>
+          <h2 id="source-title">Choose a Rumble item</h2>
+        </div>
+        <button class="button button-ghost" id="fill-example" type="button">Use example embed</button>
+      </div>
+
+      <label class="field-label" for="rumble-url">Rumble video or embed URL</label>
+      <div class="url-row">
+        <input id="rumble-url" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Rumble page URL, embed URL, or internal v… ID">
+        <button class="button button-primary" id="parse-button" type="button">Parse</button>
+      </div>
+
+      <div class="identity-grid" aria-live="polite">
+        <div><span>Input type</span><strong id="identity-type">—</strong></div>
+        <div><span>Public slug/ID</span><strong id="identity-public">—</strong></div>
+        <div><span>Internal embed ID</span><strong id="identity-embed">—</strong></div>
+        <div><span>Resolution source</span><strong id="identity-source">—</strong></div>
+      </div>
+
+      <div class="action-grid">
+        <button class="button button-primary" id="run-safe" type="button">Run safe resolution tests</button>
+        <button class="button" id="run-deep" type="button">Run deep shard sweep</button>
+        <button class="button" id="run-media" type="button">Run media probes</button>
+        <button class="button button-danger" id="stop-all" type="button">Stop all activity</button>
+      </div>
+
+      <details class="options">
+        <summary>Diagnostic options</summary>
+        <div class="option-grid">
+          <label><input id="opt-full-urls" type="checkbox"> Include full query strings in copied/exported logs</label>
+          <label><input id="opt-sw-observe" type="checkbox" checked> Observe network URLs through the service worker</label>
+          <label><input id="opt-auto-play" type="checkbox"> Attempt audible autoplay during media probes</label>
+          <label><input id="opt-save-runs" type="checkbox" checked> Save completed runs locally</label>
+          <label><input id="opt-verbose" type="checkbox" checked> Include verbose instrumentation events</label>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="test-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Step 2</p>
+          <h2 id="test-title">Capability matrix</h2>
+        </div>
+        <button class="button button-ghost" id="reset-tests" type="button">Reset statuses</button>
+      </div>
+      <div id="test-grid" class="test-grid" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="media-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Step 3</p>
+          <h2 id="media-title">Native media probes</h2>
+        </div>
+        <button class="button button-ghost" id="inspect-media" type="button">Inspect now</button>
+      </div>
+
+      <div class="media-grid">
+        <article class="media-card">
+          <div class="media-card-heading">
+            <h3>Persistent audio element</h3>
+            <span class="mini-status" id="audio-status">Idle</span>
+          </div>
+          <audio id="audio-probe" controls preload="metadata"></audio>
+          <div class="compact-actions">
+            <button class="button button-small" data-media="audio" data-action="play" type="button">Play</button>
+            <button class="button button-small" data-media="audio" data-action="pause" type="button">Pause</button>
+            <button class="button button-small" data-media="audio" data-action="back" type="button">−15s</button>
+            <button class="button button-small" data-media="audio" data-action="forward" type="button">+30s</button>
+            <button class="button button-small" data-media="audio" data-action="rate" type="button">1.5×</button>
+            <button class="button button-small" data-media="audio" data-action="clear" type="button">Clear</button>
+          </div>
+          <dl class="media-facts" id="audio-facts"></dl>
+        </article>
+
+        <article class="media-card">
+          <div class="media-card-heading">
+            <h3>Native HLS/video element</h3>
+            <span class="mini-status" id="video-status">Idle</span>
+          </div>
+          <video id="video-probe" controls playsinline preload="metadata" poster="./poster.svg"></video>
+          <div class="compact-actions">
+            <button class="button button-small" data-media="video" data-action="play" type="button">Play</button>
+            <button class="button button-small" data-media="video" data-action="pause" type="button">Pause</button>
+            <button class="button button-small" data-media="video" data-action="back" type="button">−15s</button>
+            <button class="button button-small" data-media="video" data-action="forward" type="button">+30s</button>
+            <button class="button button-small" data-media="video" data-action="rate" type="button">1.5×</button>
+            <button class="button button-small" data-media="video" data-action="clear" type="button">Clear</button>
+          </div>
+          <dl class="media-facts" id="video-facts"></dl>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="lab-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Step 4</p>
+          <h2 id="lab-title">Instrumented Rumble player laboratory</h2>
+        </div>
+        <span class="warning-chip">Third-party script boundary</span>
+      </div>
+
+      <p class="muted">Start with the opaque sandbox. Use same-origin mode only when the sandbox fails; it gives the Rumble script access to this diagnostic origin.</p>
+
+      <div class="action-grid lab-actions">
+        <button class="button button-primary" id="launch-sandbox-lab" type="button">Launch sandboxed lab</button>
+        <button class="button button-warning" id="launch-same-origin-lab" type="button">Launch same-origin lab</button>
+        <button class="button" id="lab-inspect" type="button">Request lab inspection</button>
+        <button class="button" id="lab-handoff" type="button">Try native handoff</button>
+      </div>
+
+      <div class="compact-actions lab-controls">
+        <button class="button button-small" data-lab-command="play" type="button">Lab play</button>
+        <button class="button button-small" data-lab-command="pause" type="button">Lab pause</button>
+        <button class="button button-small" data-lab-command="back" type="button">Lab −15s</button>
+        <button class="button button-small" data-lab-command="forward" type="button">Lab +30s</button>
+        <button class="button button-small" data-lab-command="rate" type="button">Lab 1.5×</button>
+        <button class="button button-small" data-lab-command="destroy" type="button">Destroy lab player</button>
+      </div>
+
+      <div class="lab-shell" id="lab-shell">
+        <div class="lab-placeholder" id="lab-placeholder">
+          <strong>No player lab is running.</strong>
+          <span>Resolve an embed ID, then launch a lab.</span>
+        </div>
+      </div>
+      <dl class="media-facts" id="lab-facts"></dl>
+    </section>
+
+    <section class="panel" aria-labelledby="log-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Step 5</p>
+          <h2 id="log-title">Diagnostic log</h2>
+        </div>
+        <span class="event-count" id="event-count">0 events</span>
+      </div>
+
+      <div class="log-toolbar">
+        <label class="search-label">Filter <input id="log-filter" type="search" placeholder="media, CORS, HLS, error…"></label>
+        <button class="button button-primary" id="copy-summary" type="button">Copy compact summary</button>
+        <button class="button" id="copy-log" type="button">Copy full log</button>
+        <button class="button" id="export-json" type="button">Export JSON</button>
+        <button class="button" id="save-run" type="button">Save snapshot</button>
+        <button class="button button-danger" id="clear-log" type="button">Clear</button>
+      </div>
+
+      <div class="copy-status" id="copy-status" role="status" aria-live="polite"></div>
+      <pre id="log-output" class="log-output" tabindex="0" aria-label="Diagnostic log output"></pre>
+    </section>
+
+    <section class="panel" aria-labelledby="history-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Local only</p>
+          <h2 id="history-title">Saved run history</h2>
+        </div>
+        <button class="button button-danger button-ghost" id="clear-history" type="button">Delete saved runs</button>
+      </div>
+      <div id="history-list" class="history-list"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>No analytics. No backend. Logs stay on this device unless you copy or export them.</p>
+    <p><span id="app-version"></span> · <a href="./README.md">README</a> · <a href="./IPHONE_TEST_GUIDE.md">iPhone guide</a> · <a href="./SECURITY_AND_PRIVACY.md">Security</a></p>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
