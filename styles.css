@@ -336,3 +336,12 @@ video { aspect-ratio: 16/9; object-fit: contain; }
   .button-primary { background: #6cae2f; color: #07101d; }
   .identity-grid > div, .test-card, .media-card, .history-item { background: #f7f9fc; }
 }
+
+.shadow-audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: .001;
+  pointer-events: none;
+  overflow: hidden;
+}

@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=0.4.0">
   <title>Rumble Capability Lab</title>
 </head>
 <body>
@@ -129,6 +129,28 @@
       </div>
     </section>
 
+
+    <section class="panel" aria-labelledby="background-title">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">Background experiment</p>
+          <h2 id="background-title">Delayed lock-screen resume</h2>
+        </div>
+        <span class="mini-status" id="background-status">Not armed</span>
+      </div>
+
+      <p class="muted">This test combines Safari's playback audio-session mode with a separate loaded—but non-playing—silent audio element. It targets the iOS suspension bug where continuous playback works but Play fails after a long background pause.</p>
+
+      <div class="action-grid">
+        <button class="button button-primary" id="arm-background-resume" type="button">Arm recommended resume fix</button>
+        <button class="button" id="inspect-background-resume" type="button">Inspect resume state</button>
+        <button class="button button-danger button-ghost" id="disarm-background-resume" type="button">Disarm</button>
+      </div>
+
+      <audio id="shadow-audio" class="shadow-audio" preload="auto" aria-hidden="true"></audio>
+      <dl class="media-facts" id="background-facts"></dl>
+    </section>
+
     <section class="panel" aria-labelledby="lab-title">
       <div class="panel-heading">
         <div>
@@ -201,9 +223,9 @@
 
   <footer class="site-footer">
     <p>No analytics. No backend. Logs stay on this device unless you copy or export them.</p>
-    <p><span id="app-version"></span> · <a href="./README.md">README</a> · <a href="./IPHONE_TEST_GUIDE.md">iPhone guide</a> · <a href="./SECURITY_AND_PRIVACY.md">Security</a></p>
+    <p><span id="app-version"></span></p>
   </footer>
 
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=0.4.0"></script>
 </body>
 </html>

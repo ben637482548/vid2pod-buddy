@@ -1,9 +1,11 @@
-const CACHE_NAME = "rumble-capability-lab-v0.3.0";
+const CACHE_NAME = "rumble-capability-lab-v0.4.0";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
+  "./styles.css?v=0.4.0",
   "./app.js",
+  "./app.js?v=0.4.0",
   "./player-lab.html",
   "./player-lab.js",
   "./manifest.webmanifest",
@@ -12,6 +14,7 @@ const APP_SHELL = [
   "./icon-192.png",
   "./icon-512.png",
   "./apple-touch-icon.png",
+  "./silence.mp3",
 ];
 
 let diagnosticsEnabled = true;
@@ -69,6 +72,22 @@ self.addEventListener("fetch", (event) => {
 
   // Never cache or rewrite media/range requests. This avoids broken seeking and 206 handling.
   if (["audio", "video", "track"].includes(request.destination) || request.headers.has("range")) return;
+
+  if (["script", "style"].includes(request.destination)) {
+    event.respondWith((async () => {
+      try {
+        const network = await fetch(request);
+        if (network.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(request, network.clone()).catch(() => {});
+        }
+        return network;
+      } catch {
+        return (await caches.match(request)) || Response.error();
+      }
+    })());
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith((async () => {

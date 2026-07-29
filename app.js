@@ -1,4 +1,4 @@
-const APP_VERSION = "0.3.0-capability-lab";
+const APP_VERSION = "0.4.0-background-resume-lab";
 const EXAMPLE_EMBED = "https://rumble.com/embed/v5a6o71/";
 const DB_NAME = "rumble-capability-lab";
 const DB_VERSION = 1;
@@ -25,6 +25,7 @@ const TEST_DEFINITIONS = [
   ["sw-observer", "Service-worker observer", "Observe request URLs without relaying or caching media."],
   ["storage", "Local persistence", "IndexedDB, quota estimate and persistent-storage capability."],
   ["media-session", "Media Session", "Lock-screen metadata and action-handler availability."],
+  ["background-resume", "Background resume", "Audio Session playback mode, shadow media and remote-control recovery diagnostics."],
 ];
 
 const state = {
@@ -41,6 +42,15 @@ const state = {
   lab: null,
   swMessages: 0,
   mediaThrottle: new WeakMap(),
+  background: {
+    armed: false,
+    shadowMode: "present-only",
+    lastRemoteAction: null,
+    lastRemoteActionAt: null,
+    lastRemoteResult: null,
+    lastPrimaryPosition: 0,
+    actionCount: 0,
+  },
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -66,6 +76,9 @@ const elements = {
   autoPlay: $("#opt-auto-play"),
   saveRuns: $("#opt-save-runs"),
   verbose: $("#opt-verbose"),
+  shadowAudio: $("#shadow-audio"),
+  backgroundFacts: $("#background-facts"),
+  backgroundStatus: $("#background-status"),
 };
 
 function nowIso() {
@@ -629,6 +642,7 @@ async function runEnvironmentTests() {
     APIs: {
       serviceWorker: "serviceWorker" in navigator,
       mediaSession: "mediaSession" in navigator,
+      audioSession: "audioSession" in navigator,
       indexedDB: "indexedDB" in window,
       storageManager: "storage" in navigator,
       performanceObserver: "PerformanceObserver" in window,
@@ -676,6 +690,143 @@ async function testStorage() {
   }
 }
 
+function noteRemoteAction(action, result = "received", data = undefined) {
+  state.background.lastRemoteAction = action;
+  state.background.lastRemoteActionAt = nowIso();
+  state.background.lastRemoteResult = result;
+  state.background.actionCount += 1;
+  log("info", "remote-control", `${action} action: ${result}.`, {
+    ...data,
+    audioSession: audioSessionSnapshot(),
+    primary: mediaSnapshot(elements.audio),
+    shadow: shadowMediaSnapshot(),
+  });
+  updateBackgroundFacts();
+}
+
+function setPlaybackAudioSession(reason = "unspecified") {
+  if (!("audioSession" in navigator)) {
+    log("warn", "audio-session", "navigator.audioSession is unavailable.", { reason });
+    return false;
+  }
+  try {
+    const before = audioSessionSnapshot();
+    navigator.audioSession.type = "playback";
+    const after = audioSessionSnapshot();
+    log("success", "audio-session", "Set audio session type to playback.", { reason, before, after });
+    updateBackgroundFacts();
+    return true;
+  } catch (error) {
+    log("warn", "audio-session", "Could not set audio session type to playback.", { reason, error });
+    updateBackgroundFacts();
+    return false;
+  }
+}
+
+function audioSessionSnapshot() {
+  if (!("audioSession" in navigator)) return { available: false };
+  try {
+    return {
+      available: true,
+      type: navigator.audioSession.type,
+      state: "state" in navigator.audioSession ? navigator.audioSession.state : "not-exposed",
+    };
+  } catch (error) {
+    return { available: true, error: `${error.name}: ${error.message}` };
+  }
+}
+
+function shadowMediaSnapshot() {
+  const media = elements.shadowAudio;
+  if (!media) return null;
+  return {
+    src: media.getAttribute("src") || "",
+    currentSrc: redactUrl(media.currentSrc || ""),
+    paused: media.paused,
+    ended: media.ended,
+    readyState: media.readyState,
+    networkState: media.networkState,
+    duration: formatNumber(media.duration),
+    error: media.error ? { code: media.error.code, message: media.error.message } : null,
+  };
+}
+
+function backgroundSnapshot() {
+  return {
+    armed: state.background.armed,
+    shadowMode: state.background.shadowMode,
+    displayMode: getDisplayMode(),
+    visibility: document.visibilityState,
+    audioSession: audioSessionSnapshot(),
+    mediaSessionPlaybackState: "mediaSession" in navigator ? navigator.mediaSession.playbackState : "unavailable",
+    lastRemoteAction: state.background.lastRemoteAction,
+    lastRemoteActionAt: state.background.lastRemoteActionAt,
+    lastRemoteResult: state.background.lastRemoteResult,
+    actionCount: state.background.actionCount,
+    primaryAudio: mediaSnapshot(elements.audio),
+    shadowAudio: shadowMediaSnapshot(),
+  };
+}
+
+function updateBackgroundFacts() {
+  if (!elements.backgroundFacts) return;
+  renderFacts(elements.backgroundFacts, backgroundSnapshot());
+  const status = elements.backgroundStatus;
+  if (status) {
+    status.textContent = state.background.armed ? "Armed" : "Not armed";
+    status.className = `mini-status ${state.background.armed ? "good" : ""}`;
+  }
+}
+
+async function resumePrimaryFromRemote() {
+  const media = elements.audio.currentSrc ? elements.audio : activeMedia();
+  if (!media?.currentSrc) {
+    noteRemoteAction("play", "no-primary-source");
+    return;
+  }
+  setPlaybackAudioSession("remote play action");
+  try {
+    await media.play();
+    navigator.mediaSession.playbackState = "playing";
+    noteRemoteAction("play", "play-promise-resolved", { currentTime: media.currentTime });
+  } catch (error) {
+    noteRemoteAction("play", `rejected:${error.name}`, { message: error.message });
+  }
+}
+
+function pausePrimaryFromRemote() {
+  const media = activeMedia() || elements.audio;
+  state.background.lastPrimaryPosition = Number.isFinite(media?.currentTime) ? media.currentTime : 0;
+  media?.pause();
+  try { navigator.mediaSession.playbackState = "paused"; } catch {}
+  noteRemoteAction("pause", "primary-paused", { position: state.background.lastPrimaryPosition });
+}
+
+function installMediaSessionHandlers() {
+  if (!("mediaSession" in navigator)) return {};
+  const handlers = {
+    play: () => { resumePrimaryFromRemote(); },
+    pause: () => { pausePrimaryFromRemote(); },
+    seekbackward: (event) => { seekActive(-(event.seekOffset || 15)); noteRemoteAction("seekbackward", "applied"); },
+    seekforward: (event) => { seekActive(event.seekOffset || 30); noteRemoteAction("seekforward", "applied"); },
+    seekto: (event) => {
+      const media = activeMedia();
+      if (media && Number.isFinite(event.seekTime)) media.currentTime = event.seekTime;
+      noteRemoteAction("seekto", "applied", { seekTime: event.seekTime });
+    },
+  };
+  const results = {};
+  for (const [action, handler] of Object.entries(handlers)) {
+    try {
+      navigator.mediaSession.setActionHandler(action, handler);
+      results[action] = "registered";
+    } catch (error) {
+      results[action] = `${error.name}: ${error.message}`;
+    }
+  }
+  return results;
+}
+
 function testMediaSession() {
   if (!("mediaSession" in navigator)) {
     setTest("media-session", "fail", "navigator.mediaSession is unavailable.");
@@ -683,27 +834,10 @@ function testMediaSession() {
   }
   try {
     updateMediaSession(state.metadata?.player || state.metadata?.oembed || {});
-    const handlers = {
-      play: () => activeMedia()?.play().catch((error) => log("warn", "media-session", "Play handler failed.", error)),
-      pause: () => activeMedia()?.pause(),
-      seekbackward: (event) => seekActive(-(event.seekOffset || 15)),
-      seekforward: (event) => seekActive(event.seekOffset || 30),
-      seekto: (event) => {
-        const media = activeMedia();
-        if (media && Number.isFinite(event.seekTime)) media.currentTime = event.seekTime;
-      },
-    };
-    const results = {};
-    for (const [action, handler] of Object.entries(handlers)) {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler);
-        results[action] = "registered";
-      } catch (error) {
-        results[action] = `${error.name}: ${error.message}`;
-      }
-    }
+    const results = installMediaSessionHandlers();
     log("success", "media-session", "Media Session handlers tested.", results);
     setTest("media-session", "pass", `Available; ${Object.values(results).filter((value) => value === "registered").length}/${Object.keys(results).length} handlers registered.`);
+    updateBackgroundFacts();
     return true;
   } catch (error) {
     setTest("media-session", "warn", error.message);
@@ -711,6 +845,44 @@ function testMediaSession() {
     return false;
   }
 }
+
+async function armBackgroundResumeExperiment() {
+  state.background.armed = true;
+  state.background.shadowMode = "present-only";
+  setTest("background-resume", "running", "Playback audio session and non-playing shadow audio are armed.");
+  const typeSet = setPlaybackAudioSession("arm recommended background-resume experiment");
+  const shadow = elements.shadowAudio;
+  shadow.src = "./silence.mp3";
+  shadow.preload = "auto";
+  shadow.loop = true;
+  shadow.load();
+  installMediaSessionHandlers();
+  updateMediaSession(state.metadata?.player || state.metadata?.oembed || {});
+  log("success", "background-resume", "Armed playback mode plus a loaded, non-playing shadow audio element.", {
+    typeSet,
+    shadow: shadowMediaSnapshot(),
+    note: "The shadow file exists and is loaded but intentionally is not playing.",
+  });
+  setTest("background-resume", "pass", `Armed; audioSession=${audioSessionSnapshot().type || "unavailable"}; shadow present and non-playing.`);
+  updateBackgroundFacts();
+  toast("Background-resume fix armed");
+}
+
+function disarmBackgroundResumeExperiment() {
+  state.background.armed = false;
+  state.background.shadowMode = "disabled";
+  try {
+    elements.shadowAudio.pause();
+    elements.shadowAudio.removeAttribute("src");
+    elements.shadowAudio.load();
+  } catch {}
+  try { if ("audioSession" in navigator) navigator.audioSession.type = "auto"; } catch {}
+  setTest("background-resume", "idle", "Experiment disarmed.");
+  log("info", "background-resume", "Disarmed background-resume experiment.", backgroundSnapshot());
+  updateBackgroundFacts();
+  toast("Experiment disarmed");
+}
+
 
 function updateMediaSession(metadata = {}) {
   if (!("mediaSession" in navigator)) return;
@@ -799,6 +971,14 @@ function attachMediaLogging(media, name) {
       updateMediaFacts();
       if (eventName === "error") setTest(name === "audio" ? "audio-media" : "video-media", "fail", describeMediaError(media));
       if (["playing", "canplay", "loadedmetadata"].includes(eventName)) setTest(name === "audio" ? "audio-media" : "video-media", "pass", `${eventName}; duration ${formatNumber(media.duration)} seconds.`);
+      if (eventName === "playing") {
+        setPlaybackAudioSession(`media ${name} playing event`);
+        try { navigator.mediaSession.playbackState = "playing"; } catch {}
+      }
+      if (eventName === "pause") {
+        try { navigator.mediaSession.playbackState = "paused"; } catch {}
+      }
+      updateBackgroundFacts();
     });
   }
   media.addEventListener("timeupdate", () => {
@@ -896,6 +1076,7 @@ async function loadMedia(media, url, testId, label) {
   media.load();
   media.src = url;
   media.load();
+  if (media === elements.audio) setPlaybackAudioSession("primary audio source assigned");
   log("info", `media-${label}`, "Assigned media source.", { url: redactUrl(url), snapshot: mediaSnapshot(media) });
   if (elements.autoPlay.checked) {
     try {
@@ -1131,6 +1312,7 @@ function createBundle({ fullUrls = elements.fullUrls.checked } = {}) {
       video: sanitizeData(mediaSnapshot(elements.video), fullUrls),
       lab: sanitizeData(state.lab?.lastSnapshot || null, fullUrls),
       labDiscovered: sanitizeData(state.lab?.discovered || [], fullUrls),
+      backgroundResume: sanitizeData(backgroundSnapshot(), fullUrls),
     },
     tests,
     events: state.events.map((event) => sanitizeData(event, fullUrls)),
@@ -1388,9 +1570,17 @@ function installGlobalErrorLogging() {
   });
   addEventListener("online", () => { updateBadges(); log("success", "network", "Browser reported online."); });
   addEventListener("offline", () => { updateBadges(); log("warn", "network", "Browser reported offline."); });
-  document.addEventListener("visibilitychange", () => log("info", "lifecycle", `visibility=${document.visibilityState}`, { hidden: document.hidden }, { verbose: true }));
-  addEventListener("pagehide", (event) => log("info", "lifecycle", "pagehide", { persisted: event.persisted }, { verbose: true }));
-  addEventListener("pageshow", (event) => log("info", "lifecycle", "pageshow", { persisted: event.persisted }, { verbose: true }));
+  document.addEventListener("visibilitychange", () => {
+    log("info", "lifecycle", `visibility=${document.visibilityState}`, backgroundSnapshot(), { verbose: true });
+    if (!document.hidden && state.background.armed) setPlaybackAudioSession("document became visible");
+    updateBackgroundFacts();
+  });
+  addEventListener("pagehide", (event) => log("info", "lifecycle", "pagehide", { persisted: event.persisted, background: backgroundSnapshot() }, { verbose: true }));
+  addEventListener("pageshow", (event) => {
+    log("info", "lifecycle", "pageshow", { persisted: event.persisted, background: backgroundSnapshot() }, { verbose: true });
+    if (state.background.armed) setPlaybackAudioSession("pageshow");
+    updateBackgroundFacts();
+  });
 }
 
 function bindEvents() {
@@ -1430,6 +1620,14 @@ function bindEvents() {
   $("#launch-same-origin-lab").addEventListener("click", () => launchLab("same-origin"));
   $("#lab-inspect").addEventListener("click", () => sendLabCommand("inspect"));
   $("#lab-handoff").addEventListener("click", tryNativeHandoff);
+  $("#arm-background-resume").addEventListener("click", armBackgroundResumeExperiment);
+  $("#disarm-background-resume").addEventListener("click", disarmBackgroundResumeExperiment);
+  $("#inspect-background-resume").addEventListener("click", () => {
+    const snapshot = backgroundSnapshot();
+    log("info", "background-resume", "Manual background-resume inspection.", snapshot);
+    updateBackgroundFacts();
+    toast("Background state logged");
+  });
   $$("[data-lab-command]").forEach((button) => button.addEventListener("click", () => sendLabCommand(button.dataset.labCommand)));
 }
 
@@ -1439,9 +1637,24 @@ async function bootstrap() {
   installGlobalErrorLogging();
   attachMediaLogging(elements.audio, "audio");
   attachMediaLogging(elements.video, "video");
+  if (elements.shadowAudio) {
+    for (const eventName of ["loadstart", "loadedmetadata", "canplay", "playing", "pause", "suspend", "error"]) {
+      elements.shadowAudio.addEventListener(eventName, () => {
+        log(eventName === "error" ? "error" : "info", "shadow-audio", eventName, shadowMediaSnapshot(), { verbose: true });
+        updateBackgroundFacts();
+      });
+    }
+  }
+  if ("audioSession" in navigator && "addEventListener" in navigator.audioSession) {
+    navigator.audioSession.addEventListener("statechange", () => {
+      log("info", "audio-session", "Audio session state changed.", audioSessionSnapshot());
+      updateBackgroundFacts();
+    });
+  }
   attachSwMessages();
   updateBadges();
   updateMediaFacts();
+  updateBackgroundFacts();
   log("info", "app", "Rumble Capability Lab started.", { version: APP_VERSION, href: redactUrl(location.href) });
   importFromHash();
   await registerServiceWorker();
